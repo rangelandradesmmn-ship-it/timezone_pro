@@ -11,8 +11,29 @@ final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
 });
 
 // Provides the list of all countries from the database
-final countriesProvider = FutureProvider<List<Country>>((ref) async {
-  return await DatabaseHelper.instance.readAllCountries();
+class CountriesNotifier extends StateNotifier<AsyncValue<List<Country>>> {
+  CountriesNotifier() : super(const AsyncValue.loading()) {
+    loadCountries();
+  }
+
+  Future<void> loadCountries() async {
+    try {
+      final countries = await DatabaseHelper.instance.readAllCountries();
+      state = AsyncValue.data(countries);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> toggleVisibility(Country country) async {
+    final updatedCountry = country.copyWith(isFavorite: !country.isFavorite);
+    await DatabaseHelper.instance.update(updatedCountry); // Assumes we add update method for web
+    await loadCountries(); // Reload
+  }
+}
+
+final countriesProvider = StateNotifierProvider<CountriesNotifier, AsyncValue<List<Country>>>((ref) {
+  return CountriesNotifier();
 });
 
 // StateNotifier for the reference time and country
@@ -40,9 +61,9 @@ class ReferenceNotifier extends StateNotifier<ReferenceState?> {
     }
     
     if (refCountry == null) {
-      final countries = await ref.read(countriesProvider.future);
-      if (countries.isNotEmpty) {
-        refCountry = countries.firstWhere((c) => c.flagCode == 'BR', orElse: () => countries.first);
+      final countriesState = ref.read(countriesProvider);
+      if (countriesState.value != null && countriesState.value!.isNotEmpty) {
+        refCountry = countriesState.value!.firstWhere((c) => c.flagCode == 'BR', orElse: () => countriesState.value!.first);
       }
     }
 
@@ -82,21 +103,27 @@ final timezoneListProvider = Provider<List<Map<String, dynamic>>>((ref) {
   final refCountry = refState.country;
   final refTime = refState.time;
   final countries = countriesAsync.value!;
+  
+  // Filter only visible countries (favorite == true), if none are favorite, show all
+  final hasFavorites = countries.any((c) => c.isFavorite);
+  final displayCountries = hasFavorites ? countries.where((c) => c.isFavorite).toList() : countries;
 
-  return countries.where((c) => c.id != refCountry.id).map((country) {
+  return displayCountries.where((c) => c.id != refCountry.id).map((country) {
     final convertedTime = TimezoneService.getConvertedTime(refTime, refCountry.timezone, country.timezone);
     
     final location = tz.getLocation(country.timezone);
     final refLocation = tz.getLocation(refCountry.timezone);
     
+    // Fix "Same time" bug: Compare local offsets at the given time
     final tzConvertedTime = tz.TZDateTime.from(convertedTime, location);
     final tzRefTime = tz.TZDateTime.from(refTime, refLocation);
-    final diff = tzConvertedTime.difference(tzRefTime);
+    
+    final offsetDiff = tzConvertedTime.timeZoneOffset - tzRefTime.timeZoneOffset;
 
     return {
       'country': country,
       'time': convertedTime,
-      'diff': diff,
+      'diff': offsetDiff,
     };
   }).toList();
 });

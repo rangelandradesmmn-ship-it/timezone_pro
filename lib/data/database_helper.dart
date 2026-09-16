@@ -7,7 +7,6 @@ class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
   static Database? _database;
   
-  // Static list for web support (since sqflite doesn't work on web natively)
   List<Country>? _webCountries;
 
   DatabaseHelper._init();
@@ -44,12 +43,7 @@ class DatabaseHelper {
   Future<Database> _initDB(String filePath) async {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
-
-    return await openDatabase(
-      path,
-      version: 1,
-      onCreate: _createDB,
-    );
+    return await openDatabase(path, version: 1, onCreate: _createDB);
   }
 
   Future _createDB(Database db, int version) async {
@@ -75,7 +69,7 @@ CREATE TABLE countries (
   }
 
   Future<Country> create(Country country) async {
-    if (kIsWeb) return country; // No-op on web
+    if (kIsWeb) return country;
     final db = await instance.database;
     final id = await db.insert('countries', country.toMap());
     return country.copyWith(id: id);
@@ -83,38 +77,36 @@ CREATE TABLE countries (
 
   Future<Country?> readCountry(int id) async {
     if (kIsWeb) {
-      if (_webCountries == null) {
-        _webCountries = _initialCountries.map((e) => Country.fromMap(e)).toList();
-      }
+      if (_webCountries == null) _webCountries = _initialCountries.map((e) => Country.fromMap(e)).toList();
       return _webCountries!.firstWhere((c) => c.id == id);
     }
-    
     final db = await instance.database;
-    final maps = await db.query(
-      'countries',
-      columns: ['id', 'country_name', 'city_name', 'timezone', 'utc_offset', 'flag_code', 'favorite'],
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-
-    if (maps.isNotEmpty) {
-      return Country.fromMap(maps.first);
-    } else {
-      return null;
-    }
+    final maps = await db.query('countries', where: 'id = ?', whereArgs: [id]);
+    if (maps.isNotEmpty) return Country.fromMap(maps.first);
+    return null;
   }
 
   Future<List<Country>> readAllCountries() async {
     if (kIsWeb) {
-      if (_webCountries == null) {
-        _webCountries = _initialCountries.map((e) => Country.fromMap(e)).toList();
-      }
+      if (_webCountries == null) _webCountries = _initialCountries.map((e) => Country.fromMap(e)).toList();
       return _webCountries!;
     }
-    
     final db = await instance.database;
-    const orderBy = 'country_name ASC';
-    final result = await db.query('countries', orderBy: orderBy);
+    final result = await db.query('countries', orderBy: 'country_name ASC');
     return result.map((json) => Country.fromMap(json)).toList();
+  }
+
+  Future<int> update(Country country) async {
+    if (kIsWeb) {
+      if (_webCountries == null) return 0;
+      final index = _webCountries!.indexWhere((c) => c.id == country.id);
+      if (index != -1) {
+        _webCountries![index] = country;
+        return 1;
+      }
+      return 0;
+    }
+    final db = await instance.database;
+    return db.update('countries', country.toMap(), where: 'id = ?', whereArgs: [country.id]);
   }
 }

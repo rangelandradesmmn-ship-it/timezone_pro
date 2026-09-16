@@ -64,6 +64,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   '${country.cityName} (${country.utcOffset})',
                   style: const TextStyle(color: Colors.white54),
                 ),
+                trailing: IconButton(
+                  icon: Icon(
+                    country.isFavorite ? Icons.visibility : Icons.visibility_off,
+                    color: country.isFavorite ? Colors.blue : Colors.white38,
+                  ),
+                  onPressed: () {
+                    ref.read(countriesProvider.notifier).toggleVisibility(country);
+                  },
+                ),
                 onTap: () {
                   ref.read(referenceProvider.notifier).setReferenceCountry(country);
                   Navigator.pop(context);
