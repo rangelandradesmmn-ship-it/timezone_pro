@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:flag/flag.dart';
 import '../models/country.dart';
@@ -28,7 +28,7 @@ class TimezoneCard extends StatelessWidget {
       final hours = diff.inHours.abs();
       final minutes = diff.inMinutes.remainder(60).abs();
       String sign = diff.isNegative ? '-' : '+';
-      diffStr = '(\$sign\${hours}h\${minutes > 0 ? '\${minutes}m' : ''})';
+      diffStr = '(\$sign\${hours}h\${minutes > 0 ? "\${minutes}m" : ""})';
     }
     
     // Check if tomorrow or yesterday
