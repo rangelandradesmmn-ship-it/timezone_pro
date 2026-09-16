@@ -1,4 +1,4 @@
-﻿import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
 import '../models/country.dart';
@@ -61,9 +61,9 @@ class ReferenceNotifier extends StateNotifier<ReferenceState?> {
     }
     
     if (refCountry == null) {
-      final countriesState = ref.read(countriesProvider);
-      if (countriesState.value != null && countriesState.value!.isNotEmpty) {
-        refCountry = countriesState.value!.firstWhere((c) => c.flagCode == 'BR', orElse: () => countriesState.value!.first);
+      final countries = await DatabaseHelper.instance.readAllCountries();
+      if (countries.isNotEmpty) {
+        refCountry = countries.firstWhere((c) => c.flagCode == 'BR', orElse: () => countries.first);
       }
     }
 
